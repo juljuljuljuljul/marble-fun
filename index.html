@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ebru Marbling</title>
+<title>Marble Fun</title>
 <style>
   :root {
     --panel: rgba(250, 246, 238, 0.94);
@@ -101,7 +101,7 @@
 </head>
 <body>
 <div id="panel">
-  <h1>Ebru <span>water marbling</span></h1>
+  <h1>Marble Fun <span>Ebru marbling</span></h1>
 
   <div id="proUI">
   <div class="label">Tool</div>
@@ -636,7 +636,7 @@ $('clear').onclick = () => { snapshot(); drops = []; pours = []; pour = null; an
 $('save').onclick = () => {
   render();
   const a = document.createElement('a');
-  a.download = 'ebru.png'; a.href = cvs.toDataURL('image/png'); a.click();
+  a.download = 'marble-fun.png'; a.href = cvs.toDataURL('image/png'); a.click();
 };
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
