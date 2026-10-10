@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ebru Marbling</title>
+<style>
+  :root {
+    --panel: rgba(250, 246, 238, 0.94);
+    --ink: #2a2622;
+    --muted: #7a7064;
+    --line: #ddd3c3;
+    --accent: #1f3a6b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f7f2e8; font: 13px/1.35 ui-sans-serif, -apple-system, "Helvetica Neue", sans-serif; color: var(--ink); }
+  body { display: flex; }
+  #panel {
+    flex: 0 0 256px; height: 100%; overflow-y: auto; padding: 18px 16px;
+    background: #f7f2e8; border-right: 1px solid var(--line);
+  }
+  #panel { display: flex; flex-direction: column; }
+  .bottomBar { margin-top: auto; padding-top: 14px; display: flex; align-items: center; justify-content: space-between; }
+  .fsBtn { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; color: var(--muted); }
+  .fsBtn svg { width: 16px; height: 16px; }
+  .iconBtns { display: flex; gap: 6px; }
+  .info { position: relative; }
+  .infoBtn { font: italic 600 15px/1 Georgia, serif; border-radius: 50%; }
+  .tip {
+    position: absolute; right: 0; bottom: calc(100% + 10px); width: 220px; z-index: 10;
+    background: var(--ink); color: #f7f2e8; font-size: 12px; line-height: 1.5; font-style: normal;
+    padding: 10px 12px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .15s, transform .15s;
+  }
+  .tip::after { content: ''; position: absolute; right: 12px; top: 100%; border: 6px solid transparent; border-top-color: var(--ink); }
+  .info:hover .tip, .info.open .tip, .infoBtn:focus-visible + .tip { opacity: 1; transform: none; pointer-events: auto; }
+  body.kid .tip { font-size: 13px; }
+  body.kid .fsBtn { width: 38px; height: 38px; }
+  .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--muted); user-select: none; }
+  .switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .track { width: 38px; height: 22px; border-radius: 11px; background: #d8cdbb; position: relative; transition: background .2s; flex: none; }
+  .knob { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .2s; }
+  .switch input:checked + .track { background: #ff7eb6; }
+  .switch input:checked + .track .knob { transform: translateX(16px); }
+  .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- kid mode ---- */
+  body.kid #panel { background: #fff8ec; font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", system-ui, sans-serif; font-size: 15px; }
+  body.kid h1 { font: 800 22px/1.1 ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif; }
+  body.kid h1 span { display: none; }
+  body.kid .label { font-size: 13px; font-weight: 700; letter-spacing: .04em; margin-top: 18px; }
+  body.kid button { border-radius: 14px; border-width: 2px; font-weight: 600; }
+  body.kid .actions button { padding: 10px 2px; font-size: 14px; white-space: nowrap; }
+  .kidTools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kidTools button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px 10px; font-size: 15px; }
+  .kidTools button span { font-size: 30px; line-height: 1; }
+  .kidTools button.on { background: #ffe3ef; color: var(--ink); border-color: #ff7eb6; }
+  .sizes { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+  .sizes button { width: 42px; height: 42px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+  .sizes button i { display: block; border-radius: 50%; background: var(--ink); }
+  .sizes button.on { border-color: #ff7eb6; background: #ffe3ef; }
+  .kidSwatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .kidSwatches .sw { border-width: 3px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.6); }
+  .kidSwatches .sw.on { border-color: var(--ink); transform: scale(1.08); }
+  .kidSwatches .sw { transition: transform .12s; }
+  .kidSwatches .sw.add::after { font-size: 30px; font-weight: 300; }
+  #stage { flex: 1; position: relative; min-width: 0; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  #cursor { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  #cursor circle { fill: none; }
+  .sw.add { display: grid; place-items: center; position: relative; background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+  .sw.add::after { content: '+'; position: absolute; font-size: 15px; line-height: 1; color: var(--muted); pointer-events: none; }
+  .sw.add input { position: absolute; inset: 0; }
+  @media (max-width: 640px) {
+    body { flex-direction: column-reverse; }
+    #panel { flex: 0 0 42%; height: auto; border-right: none; border-top: 1px solid var(--line); }
+  }
+  h1 { font: 600 15px/1 Georgia, serif; margin: 0 0 12px; letter-spacing: 0.02em; }
+  h1 span { color: var(--muted); font-weight: 400; font-style: italic; }
+  .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 12px 0 6px; }
+  .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  button {
+    font: inherit; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 7px;
+    padding: 6px 4px; cursor: pointer; transition: background .12s, border-color .12s;
+  }
+  button:hover { border-color: #b9ab95; }
+  button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+  .sw { aspect-ratio: 1; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+  .sw.on { border-color: var(--ink); }
+  .sw input { opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .row label { flex: 0 0 74px; color: var(--muted); }
+  .row input[type=range] { flex: 1; accent-color: var(--ink); min-width: 0; }
+  .row output { flex: 0 0 26px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 11px; }
+  [hidden] { display: none !important; }
+  .check { display: flex; align-items: center; gap: 6px; margin: 6px 0; color: var(--muted); }
+  .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 12px; }
+  .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>Ebru <span>water marbling</span></h1>
+
+  <div id="proUI">
+  <div class="label">Tool</div>
+  <div class="tools" id="tools">
+    <button data-tool="drop" class="on" title="1">Drop</button>
+    <button data-tool="sprinkle" title="2">Sprinkle</button>
+    <button data-tool="stylus" title="3">Stylus</button>
+    <button data-tool="comb" title="4">Comb</button>
+    <button data-tool="swirl" title="5">Swirl</button>
+    <button data-tool="pour" title="6">Pour</button>
+  </div>
+
+  <div class="label" id="toolTitle">Drop settings</div>
+  <div class="row" data-for="drop"><label>Drop size</label><input type="range" id="dropSize" min="6" max="160" value="48"><output></output></div>
+  <div class="row" data-for="sprinkle"><label>Drop size</label><input type="range" id="sprinkleSize" min="2" max="40" value="10"><output></output></div>
+  <div class="row" data-for="sprinkle"><label>Spread</label><input type="range" id="spread" min="5" max="200" value="45"><output></output></div>
+  <label class="check" data-for="drop sprinkle"><input type="checkbox" id="randSize"> Random drop size</label>
+  <div class="row" data-for="drop sprinkle" data-if="randSize"><label>Variation</label><input type="range" id="variation" min="5" max="100" value="60"><output></output></div>
+  <div class="row" data-for="pour"><label>Flow</label><input type="range" id="flow" min="6" max="160" value="48"><output></output></div>
+  <div class="row" data-for="stylus"><label>Reach</label><input type="range" id="stylusReach" min="4" max="120" value="22"><output></output></div>
+  <div class="row" data-for="comb"><label>Reach</label><input type="range" id="combReach" min="4" max="80" value="16"><output></output></div>
+  <div class="row" data-for="comb"><label>Teeth</label><input type="range" id="teeth" min="2" max="24" value="8"><output></output></div>
+  <div class="row" data-for="comb"><label>Spacing</label><input type="range" id="spacing" min="8" max="120" value="34"><output></output></div>
+  <div class="row" data-for="swirl"><label>Reach</label><input type="range" id="swirlReach" min="10" max="300" value="66"><output></output></div>
+
+  <div data-for="drop sprinkle pour">
+    <div class="label">Ink</div>
+    <div class="swatches" id="swatches"></div>
+    <label class="check"><input type="checkbox" id="cycle"> Cycle colors per drop</label>
+  </div>
+
+  <div class="label">Whole-tray passes</div>
+  <div class="presets">
+    <button data-preset="gelgitV">Gelgit ↕</button>
+    <button data-preset="gelgitH">Gelgit ↔</button>
+    <button data-preset="combD">Comb ↓</button>
+    <button data-preset="combR">Comb →</button>
+  </div>
+  <div class="row"><label>Line spacing</label><input type="range" id="traySpacing" min="8" max="120" value="34"><output></output></div>
+
+  <div class="label">Tray</div>
+  <div class="row"><label>Color</label><input type="color" id="bg" value="#efe6d2" style="width:40px;height:22px;border:none;background:none;padding:0"></div>
+  </div>
+
+  <div id="kidUI" hidden>
+    <div class="kidTools">
+      <button data-tool="drop"><span>💧</span>Drop</button>
+      <button data-tool="sprinkle"><span>✨</span>Sprinkle</button>
+      <button data-tool="stylus"><span>✏️</span>Draw</button>
+      <button data-tool="swirl"><span>🌀</span>Swirl</button>
+    </div>
+    <div class="label">Size</div>
+    <div class="sizes" id="kidSizes"></div>
+    <div class="label">Colors</div>
+    <div class="kidSwatches" id="kidSwatches"></div>
+  </div>
+
+  <div class="actions">
+    <button id="undo">Undo</button>
+    <button id="clear">Clear</button>
+    <button id="save">Save</button>
+  </div>
+
+  <div class="bottomBar">
+    <label class="switch">
+      <input type="checkbox" id="kidToggle">
+      <span class="track"><span class="knob"></span></span>
+      Kid mode
+    </label>
+    <div class="iconBtns">
+      <button id="fullscreen" class="fsBtn" title="Full screen (F)" aria-label="Full screen"></button>
+      <div class="info">
+        <button id="infoBtn" class="fsBtn infoBtn" aria-label="About this tool" aria-expanded="false" aria-describedby="infoTip">i</button>
+        <div id="infoTip" class="tip" role="tooltip">
+          A personal, just-for-fun project inspired by the traditional Turkish art of Ebru marbling.
+          It was made for personal use only&nbsp;— it's not for sale, and I don't make any profit from it.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <svg id="cursor" hidden>
+    <circle id="curMax" stroke="rgba(42,38,34,.45)" stroke-width="1" stroke-dasharray="3 4"/>
+    <circle id="curMin" stroke="rgba(42,38,34,.45)" stroke-width="1" stroke-dasharray="3 4"/>
+    <circle id="curHalo" stroke="rgba(255,255,255,.7)" stroke-width="3"/>
+    <circle id="curMain" stroke-width="1.2"/>
+  </svg>
+</div>
+
+<script>
+/*
+  Physics model — "mathematical marbling" (Jaffer, Lu et al.).
+  Ink floating on size is incompressible and doesn't diffuse, so every
+  operation is an area-preserving, continuous deformation of the surface.
+  Each ink region is stored as a polygon; every operation moves all
+  vertices with an exact forward map. Edges are refined adaptively by
+  re-mapping the *pre-image* midpoint, so curves stay exact, never blurred.
+
+  Ink drop at C with radius r:   P' = C + (P−C)·√(1 + r²/|P−C|²)
+     (existing ink is pushed out radially; area is conserved exactly)
+  Tine / stylus moving by M:     P' = P + M·g(d),  d = distance to tine
+  Vortex:                         P' = C + Rot(Δθ·g(d))·(P−C)
+  g(d) = λ/(d+λ) · e^(−d/3λ)  — viscous drag that decays with distance,
+  with extra screening from friction against the tray floor.
+*/
+const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+const BASE_COLORS = ['#1f3a6b', '#2f8c8a', '#c8902e', '#b8404a', '#1b1a19', '#f4efe4'];
+const MAX_RECENT = 5;   // second row: latest custom colors, then the picker
+let recentColors = [];
+try { recentColors = JSON.parse(localStorage.getItem('ebru-recent') || '[]').slice(0, MAX_RECENT); } catch (e) {}
+let color = BASE_COLORS[0];
+const allColors = () => [...BASE_COLORS, ...recentColors];
+let tool = 'drop';
+
+// Kid mode: fewer tools, five sizes, bright colors, quicker drops.
+const KID = {
+  tools: ['drop', 'sprinkle', 'stylus', 'swirl'],
+  colors: ['#ff595e', '#ff924c', '#ffca3a', '#8ac926', '#2ec4b6', '#1982c4', '#6a4c93', '#ff7eb6'],
+  sizeNames: ['Extra small', 'Small', 'Medium', 'Large', 'Extra large'],
+  sizes: {                                  // XS · S · M · L · XL per tool
+    drop:     [14, 24, 38, 58, 86],
+    sprinkle: [2.5, 4, 6, 8.5, 12],
+    stylus:   [8, 14, 22, 34, 50],
+    swirl:    [30, 50, 80, 120, 180],
+  },
+  spread: [80, 110, 140, 170, 210],         // sprinkle scatter radius
+  dropTime: 1.4,
+  tray: '#fffdf7',
+};
+let kid = false, kidSize = 2;
+const KID_MAX_RECENT = 3;   // fills out the 4th swatch row next to the + button
+let kidRecent = [];
+try { kidRecent = JSON.parse(localStorage.getItem('ebru-kid-recent') || '[]').slice(0, KID_MAX_RECENT); } catch (e) {}
+const reach = t => kid ? KID.sizes[t][kidSize] : val(t + 'Reach');
+let drops = [];          // { color, pts: Float64Array [x0,y0,x1,y1,…] }
+let undoStack = [];
+let dirty = true;
+
+const $ = id => document.getElementById(id);
+const val = id => +$(id).value;
+
+/* ---------- maps (write result into OX, OY) ---------- */
+let OX = 0, OY = 0;
+const g = (d, lam) => lam / (d + lam) * Math.exp(-d / (3 * lam));
+
+function dropMap(cx, cy, r) {
+  const r2 = r * r;
+  return (x, y) => {
+    const dx = x - cx, dy = y - cy;
+    const d2 = Math.max(dx * dx + dy * dy, 1e-9);
+    const s = Math.sqrt(1 + r2 / d2);
+    OX = cx + dx * s; OY = cy + dy * s;
+  };
+}
+function tinesMap(teeth, mx, my, lam) {   // teeth: flat [x,y,…]
+  const n = teeth.length;
+  return (x, y) => {
+    // Combine teeth so ink never moves faster than a tooth: f = 1 − Π(1 − gᵢ)
+    let keep = 1;
+    for (let i = 0; i < n; i += 2) keep *= 1 - g(Math.hypot(x - teeth[i], y - teeth[i + 1]), lam);
+    const f = 1 - keep;
+    OX = x + mx * f; OY = y + my * f;
+  };
+}
+function vortexMap(cx, cy, dtheta, lam) {
+  return (x, y) => {
+    const dx = x - cx, dy = y - cy;
+    const a = dtheta * g(Math.hypot(dx, dy), lam);
+    const c = Math.cos(a), s = Math.sin(a);
+    OX = cx + dx * c - dy * s; OY = cy + dx * s + dy * c;
+  };
+}
+// Infinite parallel tine lines across the tray (exact shear, never folds).
+// axis 'v': lines are vertical, ink is pulled along y.  alt: alternate directions.
+function linesMap(axis, spacing, z, lam, alt) {
+  const off = (axis === 'v' ? W : H) / 2;
+  return (x, y) => {
+    const u = (axis === 'v' ? x : y) - off;
+    const k0 = Math.round(u / spacing);
+    let f = 0;
+    for (let k = k0 - 8; k <= k0 + 8; k++) {
+      const s = alt && (k & 1) ? -1 : 1;
+      f += s * g(Math.abs(u - k * spacing), lam);
+    }
+    if (axis === 'v') { OX = x; OY = y + z * f; } else { OX = x + z * f; OY = y; }
+  };
+}
+
+/* ---------- apply a map to every polygon, with exact adaptive refinement ---------- */
+const MAX_SEG = 2.2, MIN_SEG = 0.45, MARGIN = 60;
+let buf = new Float64Array(1 << 16), bn = 0;
+function push(x, y) {
+  if (bn >= 2) { const dx = x - buf[bn - 2], dy = y - buf[bn - 1]; if (dx * dx + dy * dy < MIN_SEG * MIN_SEG) return; }
+  if (bn + 2 > buf.length) { const nb = new Float64Array(buf.length * 2); nb.set(buf); buf = nb; }
+  buf[bn++] = x; buf[bn++] = y;
+}
+const offSameSide = (ax, ay, bx, by) =>
+  (ax < -MARGIN && bx < -MARGIN) || (ax > W + MARGIN && bx > W + MARGIN) ||
+  (ay < -MARGIN && by < -MARGIN) || (ay > H + MARGIN && by > H + MARGIN);
+
+function refine(F, px, py, qx, qy, fpx, fpy, fqx, fqy, depth) {
+  const dx = fqx - fpx, dy = fqy - fpy;
+  if (depth > 9 || dx * dx + dy * dy <= MAX_SEG * MAX_SEG || offSameSide(fpx, fpy, fqx, fqy)) return;
+  const mx = (px + qx) / 2, my = (py + qy) / 2;
+  F(mx, my); const fmx = OX, fmy = OY;
+  refine(F, px, py, mx, my, fpx, fpy, fmx, fmy, depth + 1);
+  push(fmx, fmy);
+  refine(F, mx, my, qx, qy, fmx, fmy, fqx, fqy, depth + 1);
+}
+function applyMap(F, self) {
+  // spreading drops' centres are carried by the flow too (except by their own growth)
+  for (const p of pours) if (p !== self) { F(p.x, p.y); p.x = OX; p.y = OY; }
+  for (const d of drops) {
+    const p = d.pts, n = p.length;
+    bn = 0;
+    F(p[0], p[1]); let fpx = OX, fpy = OY; const f0x = fpx, f0y = fpy;
+    for (let i = 0; i < n; i += 2) {
+      const last = i + 2 >= n;
+      const qx = last ? p[0] : p[i + 2], qy = last ? p[1] : p[i + 3];
+      let fqx, fqy;
+      if (last) { fqx = f0x; fqy = f0y; } else { F(qx, qy); fqx = OX; fqy = OY; }
+      push(fpx, fpy);
+      if (n < 400000) refine(F, p[i], p[i + 1], qx, qy, fpx, fpy, fqx, fqy, 0);
+      fpx = fqx; fpy = fqy;
+    }
+    d.pts = buf.slice(0, Math.max(bn, 6));
+  }
+  dirty = true;
+}
+
+function circlePoly(cx, cy, r) {
+  const n = Math.max(24, Math.ceil(2 * Math.PI * r / 2));
+  const a = new Float64Array(n * 2);
+  for (let i = 0; i < n; i++) { const t = i / n * Math.PI * 2; a[2 * i] = cx + r * Math.cos(t); a[2 * i + 1] = cy + r * Math.sin(t); }
+  return a;
+}
+function nextColor() {
+  const c = color;
+  if ($('cycle').checked) {
+    const list = allColors();
+    color = list[(list.indexOf(c) + 1) % list.length];
+    renderSwatches(); updateCursor();
+  }
+  return c;
+}
+function addDrop(x, y, r, color) {
+  applyMap(dropMap(x, y, r));
+  drops.push({ color, pts: circlePoly(x, y, r) });
+}
+
+/* ---------- undo ---------- */
+function snapshot() {
+  undoStack.push(drops.map(d => ({ color: d.color, pts: d.pts.slice() })));
+  if (undoStack.length > 30) undoStack.shift();
+}
+function undo() { if (undoStack.length) { drops = undoStack.pop(); anim = null; pours = []; pour = null; dirty = true; } }
+
+/* ---------- interaction ---------- */
+let pointer = null;   // { x, y, down }
+let pours = [];       // spreading drops: { x, y, r2, target, start, last, rate, endless, released }
+let pour = null;      // the one currently held under the pointer
+const DROP_TIME = 2.6;   // seconds for a drop to fully settle
+const POUR_RATE = 0.22;  // steady pour: fraction of a full drop's area per second
+const POUR_FADE = 0.7;   // seconds for the flow to die away after release
+let swirl = null;     // { cx, cy, angle }
+let anim = null;      // preset animation: { F, steps }
+
+function pt(e) { const r = cvs.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+
+cvs.addEventListener('pointerdown', e => {
+  cvs.setPointerCapture(e.pointerId);
+  const p = pt(e);
+  snapshot();
+  pointer = { ...p, down: true };
+  if (tool === 'drop' || tool === 'pour') {
+    const r0 = 2;
+    addDrop(p.x, p.y, r0, nextColor());
+    const R = tool === 'pour' ? val('flow')
+            : kid ? KID.sizes.drop[kidSize] * (0.9 + Math.random() * 0.2)
+            : randSize(val('dropSize'));
+    const now = performance.now();
+    pour = { x: p.x, y: p.y, r2: r0 * r0, target: R * R, endless: tool === 'pour', start: now, last: now, rate: 0,
+             dur: kid ? KID.dropTime : DROP_TIME };
+    pours.push(pour);
+  } else if (tool === 'swirl') {
+    swirl = { cx: p.x, cy: p.y, angle: null };
+  }
+});
+
+// Drop cursor: solid ring = the size the drop will settle at; dashed rings = random-size range.
+let hover = null;
+function updateCursor() {
+  const svg = $('cursor');
+  const show = !!hover && tool === 'drop';
+  svg.toggleAttribute('hidden', !show);   // (SVG has no .hidden property)
+  if (!show) return;
+  const R = kid ? KID.sizes.drop[kidSize] : val('dropSize');
+  const k = !kid && $('randSize').checked ? Math.pow(3, val('variation') / 100) : 1;
+  const set = (id, r, show = true) => {
+    const c = $(id); c.setAttribute('cx', hover.x); c.setAttribute('cy', hover.y); c.setAttribute('r', r);
+    c.style.display = show ? '' : 'none';
+  };
+  set('curHalo', R); set('curMain', R);
+  set('curMin', R / k, k > 1); set('curMax', R * k, k > 1);
+  $('curMain').setAttribute('stroke', shade(color, 0.8));
+}
+cvs.addEventListener('pointerleave', () => { hover = null; updateCursor(); });
+cvs.addEventListener('pointermove', e => { hover = pt(e); updateCursor(); });
+cvs.addEventListener('pointermove', e => {
+  if (!pointer || !pointer.down) return;
+  const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for (const ev of events.length ? events : [e]) moveTo(pt(ev));
+});
+const end = () => { if (pointer) pointer.down = false; pointer = null; swirl = null; if (pour) pour.released = true; pour = null; };
+cvs.addEventListener('pointerup', end);
+cvs.addEventListener('pointercancel', end);
+
+function moveTo(p) {
+  const lam = reach(tool);
+  if (tool === 'stylus' || tool === 'comb') {
+    let dx = p.x - pointer.x, dy = p.y - pointer.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.5) return;
+    const steps = Math.ceil(len / (0.3 * lam));       // small steps → map never folds
+    const sx = dx / steps, sy = dy / steps, nx = -dy / len, ny = dx / len;
+    const nT = tool === 'stylus' ? 1 : val('teeth'), sp = val('spacing');
+    const teeth = new Float64Array(nT * 2);
+    for (let s = 0; s < steps; s++) {
+      const ax = pointer.x + sx * s, ay = pointer.y + sy * s;
+      for (let i = 0; i < nT; i++) {
+        const o = (i - (nT - 1) / 2) * sp;
+        teeth[2 * i] = ax + nx * o; teeth[2 * i + 1] = ay + ny * o;
+      }
+      applyMap(tinesMap(teeth, sx, sy, lam));
+    }
+    pointer.x = p.x; pointer.y = p.y;
+  } else if (tool === 'swirl' && swirl) {
+    pointer.x = p.x; pointer.y = p.y;
+    const dx = p.x - swirl.cx, dy = p.y - swirl.cy;
+    if (Math.hypot(dx, dy) < 6) return;
+    const a = Math.atan2(dy, dx);
+    if (swirl.angle !== null) {
+      let da = a - swirl.angle;
+      if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
+      const steps = Math.ceil(Math.abs(da) / 0.08);
+      for (let s = 0; s < steps; s++) applyMap(vortexMap(swirl.cx, swirl.cy, da / steps, lam));
+    }
+    swirl.angle = a;
+  } else {
+    pointer.x = p.x; pointer.y = p.y;
+  }
+}
+
+function tick() {
+  // Growing drop: repeated drops at the same centre compose exactly —
+  // the new circle grows from r to √(r²+ρ²) while pushing everything out.
+  for (const p of pours) {
+    const now = performance.now();
+    const t = (now - p.start) / 1000, dt = Math.min((now - p.last) / 1000, 0.05);
+    p.last = now;
+    let add = 0;
+    if (!p.endless) {
+      // Drop: radius follows an exponential ease-out — a fast burst, then a long slow settle.
+      const u = Math.min(t / p.dur, 1);
+      const e = (1 - Math.pow(2, -10 * u)) / (1 - Math.pow(2, -10));
+      const r2 = Math.max(p.r2, p.target * e * e);
+      add = r2 - p.r2;
+      if (u >= 1) p.done = true;
+    } else {
+      // Pour: ink flows in at a rate that surges at first, then settles to a steady trickle;
+      // after release the flow dies away exponentially, so the spread coasts to a stop.
+      if (!p.released) p.rate = p.target * POUR_RATE * (1 + 5 * Math.exp(-t / 0.35));
+      else p.rate *= Math.exp(-dt / POUR_FADE);
+      add = p.rate * dt;
+      if (p.released && p.rate < p.target * 0.002) p.done = true;
+    }
+    if (add > 1e-4) { applyMap(dropMap(p.x, p.y, Math.sqrt(add)), p); p.r2 += add; }
+  }
+  if (pours.some(p => p.done)) pours = pours.filter(p => !p.done);
+  if (tool === 'sprinkle' && pointer && pointer.down) {
+    for (let k = 0; k < 2; k++) {
+      const a = Math.random() * Math.PI * 2;
+      // kid mode scatters evenly over a wide disc; pro mode clusters near the brush
+      const rr = kid ? KID.spread[kidSize] * Math.sqrt(Math.random()) : Math.abs(gauss()) * val('spread');
+      const r = kid ? KID.sizes.sprinkle[kidSize] * (0.6 + Math.random() * 0.8) : randSize(val('sprinkleSize'));
+      addDrop(pointer.x + Math.cos(a) * rr, pointer.y + Math.sin(a) * rr, r, nextColor());
+    }
+  }
+  if (anim) { applyMap(anim.F); if (--anim.steps <= 0) anim = null; }
+  if (dirty) { render(); dirty = false; }
+  requestAnimationFrame(tick);
+}
+// Random size is log-symmetric: at 100% variation a drop is anywhere from ⅓× to 3× the set size.
+function randSize(r) {
+  if (!$('randSize').checked) return r;
+  return r * Math.exp((val('variation') / 100) * (Math.random() * 2 - 1) * Math.log(3));
+}
+function gauss() { return Math.sqrt(-2 * Math.log(Math.random() + 1e-9)) * Math.cos(2 * Math.PI * Math.random()); }
+
+/* ---------- whole-tray passes (exact: N small shears = one big shear) ---------- */
+function runPreset(name) {
+  snapshot();
+  const sp = val('traySpacing'), lam = Math.max(3, sp * 0.22), N = 24;
+  let F;
+  if (name === 'gelgitV') F = linesMap('v', sp * 2.5, (H * 0.18) / N, lam * 2, true);
+  if (name === 'gelgitH') F = linesMap('h', sp * 2.5, (W * 0.18) / N, lam * 2, true);
+  if (name === 'combD')   F = linesMap('v', sp, (H * 0.22) / N, lam, false);
+  if (name === 'combR')   F = linesMap('h', sp, (W * 0.22) / N, lam, false);
+  anim = { F, steps: N };
+}
+
+/* ---------- rendering ---------- */
+let grain = null;
+function makeGrain() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const x = c.getContext('2d'), id = x.createImageData(256, 256);
+  for (let i = 0; i < id.data.length; i += 4) {
+    const v = 200 + Math.random() * 55; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255;
+  }
+  x.putImageData(id, 0, 0);
+  grain = ctx.createPattern(c, 'repeat');
+}
+function shade(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) * k, g2 = ((n >> 8) & 255) * k, b = (n & 255) * k;
+  return `rgb(${r | 0},${g2 | 0},${b | 0})`;
+}
+function render() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = kid ? KID.tray : $('bg').value;
+  ctx.fillRect(0, 0, W, H);
+  for (const d of drops) {
+    const p = d.pts;
+    ctx.beginPath();
+    ctx.moveTo(p[0], p[1]);
+    for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
+    ctx.closePath();
+    ctx.fillStyle = d.color; ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = grain; ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = $('stage').clientWidth; H = $('stage').clientHeight;
+  cvs.width = W * DPR; cvs.height = H * DPR;
+  dirty = true;
+}
+
+/* ---------- UI ---------- */
+const HINTS = {
+  drop: 'Click to drop ink. Each drop pushes the older ink outward and keeps its area exactly.',
+  sprinkle: 'Hold and move to flick lots of small drops, like tapping a brush.',
+  stylus: 'Drag a needle through the ink. The fluid drags along, then the effect fades with distance.',
+  comb: 'Drag a comb (teeth across the direction you move). Set the tooth count and spacing below.',
+  swirl: 'Press a center point, then circle around it to twist the ink into a vortex.',
+  pour: 'Hold to keep pouring: the drop keeps growing for as long as you press.'
+};
+const KID_HINTS = {
+  drop: 'Tap to drop paint. Drop more inside to make rings!',
+  sprinkle: 'Hold and wiggle to sprinkle tiny dots!',
+  stylus: 'Drag through the paint to pull it into shapes!',
+  swirl: 'Press down, then go round and round!'
+};
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
+  $('toolTitle').textContent = t[0].toUpperCase() + t.slice(1) + ' settings';
+  updateVisibility();
+  updateCursor();
+}
+function updateVisibility() {
+  document.querySelectorAll('[data-for]').forEach(el => {
+    const ifOn = el.dataset.if;
+    el.hidden = !el.dataset.for.split(' ').includes(tool) || (ifOn && !$(ifOn).checked);
+  });
+}
+function renderSwatches() {
+  const el = $('swatches'); el.innerHTML = '';
+  const list = allColors();
+  list.forEach((c, i) => {
+    const s = document.createElement('div');
+    s.className = 'sw' + (list.indexOf(color) === i ? ' on' : '');
+    s.style.background = c;
+    s.title = c;
+    s.onclick = () => { color = c; renderSwatches(); updateCursor(); };
+    el.appendChild(s);
+  });
+  // picker: live-previews while dragging, saves into the recent row once chosen
+  const s = document.createElement('div');
+  s.className = 'sw add'; s.title = 'Add a custom color';
+  const inp = document.createElement('input'); inp.type = 'color'; inp.value = color;
+  inp.oninput = () => { color = inp.value; s.style.background = color; el.querySelectorAll('.on').forEach(n => n.classList.remove('on')); updateCursor(); };
+  inp.onchange = () => {
+    const c = inp.value.toLowerCase();
+    color = c;
+    if (!BASE_COLORS.includes(c)) recentColors = [c, ...recentColors.filter(x => x !== c)].slice(0, MAX_RECENT);
+    try { localStorage.setItem('ebru-recent', JSON.stringify(recentColors)); } catch (e) {}
+    renderSwatches(); updateCursor();
+  };
+  s.appendChild(inp); el.appendChild(s);
+}
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => runPreset(b.dataset.preset));
+document.querySelectorAll('.row').forEach(r => {
+  const i = r.querySelector('input[type=range]'), o = r.querySelector('output');
+  if (!i || !o) return;
+  const f = () => o.textContent = i.value; i.addEventListener('input', f); f();
+});
+$('randSize').onchange = () => { updateVisibility(); updateCursor(); };
+// while adjusting size, preview the ring in the middle of the tray
+['dropSize', 'variation'].forEach(id => {
+  $(id).addEventListener('input', () => { if (!hover || hover.preview) hover = { x: W / 2, y: H / 2, preview: true }; updateCursor(); });
+  $(id).addEventListener('change', () => { if (hover && hover.preview) { hover = null; updateCursor(); } });
+});
+$('bg').oninput = () => dirty = true;
+// tool descriptions live in the buttons' hover tooltips
+document.querySelectorAll('#tools [data-tool]').forEach(b => b.title = HINTS[b.dataset.tool]);
+document.querySelectorAll('.kidTools [data-tool]').forEach(b => b.title = KID_HINTS[b.dataset.tool]);
+$('undo').onclick = undo;
+$('clear').onclick = () => { snapshot(); drops = []; pours = []; pour = null; anim = null; dirty = true; };
+$('save').onclick = () => {
+  render();
+  const a = document.createElement('a');
+  a.download = 'ebru.png'; a.href = cvs.toDataURL('image/png'); a.click();
+};
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z' || e.key === 'z') { e.preventDefault(); undo(); return; }
+  if (e.key === 'f') { fsElement() ? exitFullscreen() : enterFullscreen(); return; }
+  const t = (kid ? KID.tools : ['drop', 'sprinkle', 'stylus', 'comb', 'swirl', 'pour'])[+e.key - 1];
+  if (t) setTool(t);
+});
+new ResizeObserver(resize).observe($('stage'));
+
+/* ---------- kid mode ---------- */
+function renderKid() {
+  const sz = $('kidSizes'); sz.innerHTML = '';
+  [10, 15, 20, 26, 32].forEach((d, i) => {
+    const b = document.createElement('button');
+    b.className = i === kidSize ? 'on' : ''; b.title = KID.sizeNames[i]; b.setAttribute('aria-label', KID.sizeNames[i]);
+    b.innerHTML = `<i style="width:${d}px;height:${d}px"></i>`;
+    b.onclick = () => { kidSize = i; renderKid(); updateCursor(); };
+    sz.appendChild(b);
+  });
+  const el = $('kidSwatches'); el.innerHTML = '';
+  [...KID.colors, ...kidRecent].forEach(c => {
+    const s = document.createElement('div');
+    s.className = 'sw' + (color === c ? ' on' : '');
+    s.style.background = c;
+    s.onclick = () => { color = c; renderKid(); updateCursor(); };
+    el.appendChild(s);
+  });
+  // + opens the color picker; the chosen color joins the swatches
+  const add = document.createElement('div');
+  add.className = 'sw add'; add.title = 'Pick your own color';
+  const inp = document.createElement('input'); inp.type = 'color'; inp.value = color;
+  inp.oninput = () => { color = inp.value; updateCursor(); };
+  inp.onchange = () => {
+    const c = inp.value.toLowerCase();
+    color = c;
+    if (!KID.colors.includes(c)) kidRecent = [c, ...kidRecent.filter(x => x !== c)].slice(0, KID_MAX_RECENT);
+    try { localStorage.setItem('ebru-kid-recent', JSON.stringify(kidRecent)); } catch (e) {}
+    renderKid(); updateCursor();
+  };
+  add.appendChild(inp); el.appendChild(add);
+}
+function setKid(on) {
+  kid = on;
+  $('kidToggle').checked = on;
+  document.body.classList.toggle('kid', on);
+  $('proUI').hidden = on; $('kidUI').hidden = !on;
+  $('undo').textContent = on ? '↩︎ Undo' : 'Undo';
+  $('clear').textContent = on ? '🧽 Clear' : 'Clear';
+  $('save').textContent = on ? '🖼️ Save' : 'Save';
+  color = on ? KID.colors[0] : BASE_COLORS[0];
+  try { localStorage.setItem('ebru-kid', on ? '1' : '0'); } catch (e) {}
+  if (on) renderKid(); else renderSwatches();
+  setTool(on && !KID.tools.includes(tool) ? 'drop' : tool);
+  dirty = true;
+}
+$('kidToggle').onchange = e => {
+  setKid(e.target.checked);
+  if (e.target.checked) enterFullscreen();   // kid mode goes full screen (the toggle click allows it)
+};
+
+/* ---------- full screen ---------- */
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+function enterFullscreen() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req && !fsElement()) Promise.resolve(req.call(el)).catch(() => {});
+}
+function exitFullscreen() {
+  const ex = document.exitFullscreen || document.webkitExitFullscreen;
+  if (ex && fsElement()) Promise.resolve(ex.call(document)).catch(() => {});
+}
+const FS_ICONS = {
+  enter: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>',
+  exit:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg>',
+};
+function updateFsButton() {
+  const on = !!fsElement(), b = $('fullscreen');
+  b.innerHTML = on ? FS_ICONS.exit : FS_ICONS.enter;
+  b.title = on ? 'Exit full screen (F)' : 'Full screen (F)';
+  b.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
+}
+updateFsButton();
+
+// info tooltip: shows on hover, and click/tap toggles it (for touch screens)
+$('infoBtn').onclick = e => {
+  e.stopPropagation();
+  const open = $('infoBtn').parentElement.classList.toggle('open');
+  $('infoBtn').setAttribute('aria-expanded', open);
+};
+document.addEventListener('click', e => {
+  if (!e.target.closest('.info')) { $('infoBtn').parentElement.classList.remove('open'); $('infoBtn').setAttribute('aria-expanded', false); }
+});
+$('fullscreen').onclick = () => fsElement() ? exitFullscreen() : enterFullscreen();
+document.addEventListener('fullscreenchange', updateFsButton);
+document.addEventListener('webkitfullscreenchange', updateFsButton);
+if (!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) $('fullscreen').hidden = true;
+
+resize(); makeGrain(); renderSwatches(); setTool('drop');
+let savedKid = false;
+try { savedKid = localStorage.getItem('ebru-kid') === '1'; } catch (e) {}
+if (savedKid) setKid(true);
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
